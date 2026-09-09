@@ -11,7 +11,6 @@ import java.awt.*;
 import java.time.Duration;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Scanner;
 
@@ -31,36 +30,44 @@ public class Main {
 
     static int tabNum;
     static int nextTab;
-    static LocalTime startTime = LocalTime.of(8, 0, 0);
+    static LocalTime startTime = LocalTime.of(3, 58, 0);
 
     // ---------- main method ----------
     public static void main(String[] args) {
         // If you use Selenium 4.6+, you can remove this setProperty and let Selenium Manager handle it.
         // System.setProperty("webdriver.edge.driver", "C:\\path\\to\\msedgedriver.exe");
 
-        String STUDENT_ID = "40000000";
-        String EDU_PASS   = "password";
+        String STUDENT_ID = "###########";
+        String EDU_PASS   = "###########";
 
         if (type) {
             System.out.println("I am in registration mode at moment " + startTime);
             timeMargin = 0;
             setStartRegTime(STUDENT_ID, EDU_PASS);
 
-            threads.add(new TestCourse(STUDENT_ID, EDU_PASS, 6));
+            threads.add(new TestCourse(STUDENT_ID, EDU_PASS, 1));
 
-            threads.add(new RegisterCourse(STUDENT_ID, EDU_PASS, 9, threads.getFirst(), 0));
-            threads.add(new RegisterCourse(STUDENT_ID, EDU_PASS, 3, threads.getFirst(), 300));
-            threads.add(new RegisterCourse(STUDENT_ID, EDU_PASS, 1, threads.getFirst(), 700));
+            threads.add(new RegisterCourse(STUDENT_ID, EDU_PASS, 1, threads.getFirst(), 0));
+//            threads.add(new RegisterCourse(STUDENT_ID, EDU_PASS, 3, threads.getFirst(), 300));
+//            threads.add(new RegisterCourse(STUDENT_ID, EDU_PASS, 1, threads.getFirst(), 700));
 
             tabNum = threads.size();
             nextTab = 2;
-            nextCourse = threads.get(1);
+            if (tabNum > 1) {
+                nextCourse = threads.get(1);
+            }
             threads.getFirst().start();
 
         } else {
-            threads.add(new RegOnCap(STUDENT_ID, EDU_PASS, 12));
+            threads.add(new RegOnCap(STUDENT_ID, EDU_PASS, 1));
+            threads.add(new RegOnCap(STUDENT_ID, EDU_PASS, 2));
+            threads.add(new RegOnCap(STUDENT_ID, EDU_PASS, 3));
+
             tabNum = threads.size();
             nextTab = 2;
+            if (tabNum > 1) {
+                nextCourse = threads.get(1);
+            }
             threads.getFirst().start();
         }
     }
@@ -76,8 +83,12 @@ public class Main {
         usernameM.sendKeys(studentID);
         passwordM.sendKeys(pass);
 
-        // wait for Enter in console to continue
-        scan.nextLine();
+// wait until user types 1 and presses Enter to continue
+        String userInput;
+        do {
+            userInput = scan.nextLine();
+        } while (!userInput.equals("1"));
+
 
         if (nextTab < tabNum) {
             nextCourse.start();
@@ -160,8 +171,9 @@ public class Main {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("H:mm:ss");
         LocalTime nowTime = LocalTime.parse(timeElement.getAttribute("innerHTML"), formatter);
         clockRead += System.currentTimeMillis();
+        System.out.println("Time read from edu.sharif.edu: " + timeElement.getAttribute("innerHTML") + " -> parsed as " + nowTime);
 
-        long diff = nowTime.until(startTime, ChronoUnit.SECONDS);
+        long diff = Duration.between(nowTime, startTime).getSeconds();
         startRegTime = System.currentTimeMillis() + diff * 1000 - clockDelay - clockRead + timeMargin;
 
         clockDriver.close();
@@ -233,7 +245,7 @@ public class Main {
                     try {
                         do {
                             registerButton.click();
-                            Thread.sleep(500);
+                            Thread.sleep(50);
                         } while (registerButton.isDisplayed());
                     } catch (Exception ignored) {}
 
@@ -272,17 +284,33 @@ public class Main {
 
             long nowTime = System.currentTimeMillis();
             long diff = Main.startRegTime - nowTime;
+            System.out.println("[TestCourse] startRegTime=" + Main.startRegTime + " nowTime=" + nowTime + " diff=" + diff + " sleepFor=" + (diff - Main.testTime));
 
-            try { Thread.sleep(diff - Main.testTime); } catch (InterruptedException e) { throw new RuntimeException(e); }
+            try {
+                Thread.sleep(diff - Main.testTime);
+            } catch (IllegalArgumentException e) {
+                System.out.println("[TestCourse] Sleep value was NEGATIVE, skipping sleep! diff - testTime = " + (diff - Main.testTime));
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+
+            System.out.println("[TestCourse] Reached the point right before clicking. About to click now...");
 
             long clickDelay = -System.currentTimeMillis();
-            button.click();
+            try {
+                button.click();
+                System.out.println("[TestCourse] Click was executed successfully!");
+            } catch (Exception e) {
+                System.out.println("[TestCourse] Click FAILED with exception: " + e);
+                e.printStackTrace();
+            }
             clickDelay += System.currentTimeMillis();
 
             long ping = -System.currentTimeMillis();
             try {
                 wait.until(ExpectedConditions.invisibilityOf(popup));
                 ping += System.currentTimeMillis();
+                ping -=1 ;
             } catch (Exception e) {
                 ping = 10;
             }
